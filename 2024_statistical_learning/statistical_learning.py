@@ -64,8 +64,8 @@ class TestTrial(Trial):
 
         self.sound_played = False
         self.snd = sound.Sound(value=parameters['freq'], 
+                volume=parameters['volume'], 
                 secs=0.5, octave=4, stereo=-1) 
-                #, volume=1.0, 
                 # loops=0, sampleRate=44100, blockSize=128, 
                 # preBuffer=-1, hamming=True, startTime=0, 
                 # stopTime=-1, name='', autoLog=True)
@@ -119,13 +119,20 @@ class TestEyetrackerSession(PylinkEyetrackerSession):
         # map onto frequencies:
         freqs = into_logspaced_freqs(samples, -cutoff, cutoff, 500, 3)
 
+        # compute volumes (correcting for equal-loudness contour):
+        from iso226 import *
+        contour_interpolated = iso226_spl_itpl(L_N=40, hfe=False, k=3)
+        contour_inverted = 1 / contour_interpolated(freqs)
+        volumes = contour_inverted / contour_inverted.max()
+
         self.trials = []
         for trial_nr in range(self.n_trials):
 
             parameters = {'state':states[trial_nr],
                             'sample':samples[trial_nr],
                             'LLRin':LLRin[trial_nr],
-                            'freq':freqs[trial_nr],}
+                            'freq':freqs[trial_nr],
+                            'volume':volumes[trial_nr],}
             
             self.trials.append(
                 TestTrial(session=self,
