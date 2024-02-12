@@ -1,6 +1,9 @@
+import os.path as op
 import numpy as np
 import scipy as sp
 from scipy import stats
+
+import datetime
 
 from psychopy import prefs
 prefs.hardware['audioLib'] = ['pygame']
@@ -8,7 +11,6 @@ from psychopy import sound
 print(sound.Sound)
 from psychopy.visual import TextStim
 from psychopy.visual import GratingStim
-
 
 from exptools2.core import PylinkEyetrackerSession
 from exptools2.core import Trial
@@ -64,21 +66,23 @@ class TestTrial(Trial):
 
         self.sound_played = False
         self.snd = sound.Sound(value=parameters['freq'], 
-                volume=parameters['volume'], 
+                # volume=parameters['volume'], 
                 secs=0.5, octave=4, stereo=-1) 
                 # loops=0, sampleRate=44100, blockSize=128, 
                 # preBuffer=-1, hamming=True, startTime=0, 
                 # stopTime=-1, name='', autoLog=True)
-        if parameters['state'] == -1:
-            fixation_color = 'green'
-        elif parameters['state'] == 1:
-            fixation_color = 'red'
+        # if parameters['state'] == -1:
+        #     fixation_color = 'green'
+        # elif parameters['state'] == 1:
+        #     fixation_color = 'red'
+        self.snd.setVolume(parameters['volume'])
+        fixation_color = 'black'
         
         self.fixation = GratingStim(self.session.win,
                                     pos=(0,0),
                                     tex='sin',
                                     mask='circle',
-                                    size=0.5,
+                                    size=0.1,
                                     texRes=9,
                                     color=fixation_color,
                                     sf=0)
@@ -102,7 +106,7 @@ class TestEyetrackerSession(PylinkEyetrackerSession):
         super().__init__(output_str, output_dir=output_dir,
                          settings_file=settings_file, eyetracker_on=eyetracker_on)
 
-    def create_trials(self, durations=(0.1, 1), timing='seconds'):
+    def create_trials(self, durations=(0.2, 1), timing='seconds'):
         
         # draw states:
         mu = 20          # means of generative distributions (polar angles relative to downward vertical midline of zero; + is left of midline)
@@ -120,7 +124,7 @@ class TestEyetrackerSession(PylinkEyetrackerSession):
         freqs = into_logspaced_freqs(samples, -cutoff, cutoff, 500, 3)
 
         # compute volumes (correcting for equal-loudness contour):
-        from iso226 import *
+        from iso226 import iso226_spl_itpl
         contour_interpolated = iso226_spl_itpl(L_N=40, hfe=False, k=3)
         contour_inverted = 1 / contour_interpolated(freqs)
         volumes = contour_inverted / contour_inverted.max()
@@ -157,8 +161,12 @@ class TestEyetrackerSession(PylinkEyetrackerSession):
 
 
 if __name__ == '__main__':
-
-    settings_file = 'settings.yml'
-    session = TestEyetrackerSession('sub-01', eyetracker_on=False, n_trials=10, settings_file=settings_file)
+    subject_nr = input('Subject #: ')
+    block_nr = input('Block #: ')
+    dt = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+    settings = op.join(op.dirname(__file__), 'settings.yml')
+    session = TestEyetrackerSession(output_str='{}_{}_{}'.format(subject_nr, block_nr, dt),
+                                    output_dir='data/',
+                                    eyetracker_on=True, n_trials=600, settings_file=settings)
     session.create_trials()
     session.run()
