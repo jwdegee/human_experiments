@@ -7,7 +7,7 @@ import datetime
 
 from psychopy import prefs
 prefs.hardware['audioLib'] = ['pygame']
-from psychopy import sound
+from psychopy import sound, core
 print(sound.Sound)
 from psychopy.visual import TextStim
 from psychopy.visual import GratingStim
@@ -25,6 +25,12 @@ def into_logspaced_freqs(values, values_min, values_max, min_f, nr_octaves):
                             num=10000)
     freqs = np.percentile(all_freqs,values_scaled)
     return freqs
+
+def into_ories(value, leftMin, leftMax, rightMin, rightMax):
+    leftSpan = leftMax - leftMin
+    rightSpan = rightMax - rightMin
+    valueScaled = (value - leftMin) / leftSpan
+    return rightMin + (valueScaled * rightSpan)
 
 def make_samples(H, mu, sigma, cutoff, n_samples):
 
@@ -64,38 +70,55 @@ class TestTrial(Trial):
     def __init__(self, session, trial_nr, phase_durations, parameters, **kwargs):
         super().__init__(session, trial_nr, phase_durations, parameters=parameters, **kwargs)
 
-        self.sound_played = False
-        self.snd = sound.Sound(value=parameters['freq'], 
-                # volume=parameters['volume'], 
-                secs=0.5, octave=4, stereo=-1) 
-                # loops=0, sampleRate=44100, blockSize=128, 
-                # preBuffer=-1, hamming=True, startTime=0, 
-                # stopTime=-1, name='', autoLog=True)
-        # if parameters['state'] == -1:
-        #     fixation_color = 'green'
-        # elif parameters['state'] == 1:
-        #     fixation_color = 'red'
-        self.snd.setVolume(parameters['volume'])
-        fixation_color = 'black'
-        
+        self.parameters = parameters
+
+        # clock:
+        self.trialClock = core.Clock()
+
+        # fixation:
+        fixation_color = 'red'
         self.fixation = GratingStim(self.session.win,
                                     pos=(0,0),
                                     tex='sin',
                                     mask='circle',
-                                    size=0.1,
+                                    size=0.2,
                                     texRes=9,
                                     color=fixation_color,
                                     sf=0)
 
+        # gabor:
+        if 'ori' in self.parameters:
+            size = 800
+            sf = 0.01
+            self.grating = GratingStim( 
+                win=self.session.win, tex='sin', mask='circle', units='pix', 
+                size=[size,size], contrast=1, opacity=1, sf=sf, texRes=128,
+            )
+            self.grating.ori = self.parameters['ori']
+        
+        # sound:
+        if 'freq' in self.parameters:
+            self.sound_played = False
+            self.snd = sound.Sound(value=self.parameters['freq'], 
+                    secs=0.5, octave=4, stereo=-1) 
+            self.snd.setVolume(self.parameters['volume'])
+
     def draw(self):
         """ Draws stimuli """
+        
+        t = self.trialClock.getTime()
+        
         if self.phase == 0:
             self.fixation.draw()
         else:
+            if 'freq' in self.parameters:
+                if not self.sound_played:
+                    self.snd.play()
+                    self.sound_played = True
+            if 'ori' in self.parameters:
+                self.grating.draw()
+                # self.grating.setPhase(0.5*t)
             self.fixation.draw()
-            if not self.sound_played:
-                self.snd.play()
-                self.sound_played = True
 
 class TestEyetrackerSession(PylinkEyetrackerSession):
     """ Simple session with x trials. """
@@ -103,16 +126,17 @@ class TestEyetrackerSession(PylinkEyetrackerSession):
     def __init__(self, output_str, output_dir=None, settings_file=None, n_trials=10, eyetracker_on=True):
         """ Initializes TestSession object. """
         self.n_trials = n_trials
+        self.block_id = int(output_str.split('_')[1])
         super().__init__(output_str, output_dir=output_dir,
                          settings_file=settings_file, eyetracker_on=eyetracker_on)
 
-    def create_trials(self, durations=(0.2, 1), timing='seconds'):
+    def create_trials(self, timing='seconds'):
         
         # draw states:
         mu = 20          # means of generative distributions (polar angles relative to downward vertical midline of zero; + is left of midline)
         sigma = 20        # standard deviations
         cutoff = sp.stats.norm.ppf(0.99,loc=mu,scale=sigma)
-        H = 0.10 # hazard rate of distribution switches
+        H = 0.08 # hazard rate of distribution switches
         states, samples, LLRin = make_samples(H=H, 
                                               mu=[-mu,mu], 
                                               sigma=[sigma,sigma],
@@ -129,15 +153,29 @@ class TestEyetrackerSession(PylinkEyetrackerSession):
         contour_inverted = 1 / contour_interpolated(freqs)
         volumes = contour_inverted / contour_inverted.max()
 
+        # map onto orientations:
+        ories = into_ories(samples, -cutoff, cutoff, -75, 75)
+        
         self.trials = []
         for trial_nr in range(self.n_trials):
-
-            parameters = {'state':states[trial_nr],
-                            'sample':samples[trial_nr],
-                            'LLRin':LLRin[trial_nr],
-                            'freq':freqs[trial_nr],
-                            'volume':volumes[trial_nr],}
             
+            if self.block_id%2 == 0:
+                parameters = {'state':states[trial_nr],
+                                'sample':samples[trial_nr],
+                                'LLRin':LLRin[trial_nr],
+                                'freq':freqs[trial_nr],
+                                'volume':volumes[trial_nr],}
+            else:
+                parameters = {'state':states[trial_nr],
+                                'sample':samples[trial_nr],
+                                'LLRin':LLRin[trial_nr],
+                                'ori':ories[trial_nr],}
+            
+            if trial_nr == 0:
+                durations=(1, 1.2)
+            else:
+                durations=(0, 1.2)
+
             self.trials.append(
                 TestTrial(session=self,
                           trial_nr=trial_nr,
@@ -167,6 +205,6 @@ if __name__ == '__main__':
     settings = op.join(op.dirname(__file__), 'settings.yml')
     session = TestEyetrackerSession(output_str='{}_{}_{}'.format(subject_nr, block_nr, dt),
                                     output_dir='data/',
-                                    eyetracker_on=True, n_trials=600, settings_file=settings)
+                                    eyetracker_on=False, n_trials=600, settings_file=settings)
     session.create_trials()
     session.run()
