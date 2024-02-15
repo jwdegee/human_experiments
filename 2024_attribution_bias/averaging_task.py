@@ -186,7 +186,7 @@ class GaborSession(PylinkEyetrackerSession): #Run session (or self) with multipl
 
         #Defining the stimuli wrt the task + conditions 
         stimuli = ['diagonal', 'cardinal']
-        conditions = ['normal', 'normal', 'AS_0', 'AS_1', 'AS_2']
+        conditions = ['normal', 'impossible']
 
         #creation of a dict with all the trial parameters (task, stimuli, contrast of each participant, condition) = all the combination possible?
         n_trials_per_strata = int(self.n_trials / len(stimuli) / len(conditions)) #number of trials per ?
@@ -200,20 +200,30 @@ class GaborSession(PylinkEyetrackerSession): #Run session (or self) with multipl
         for i in range(self.n_trials):
             stim = trial_parameters[i]['stimulus']
             cond = trial_parameters[i]['condition']
-            difficulty = staircase._nextIntensity
-            if stim == 'cardinal':
-                evidence = make_evidence(1-difficulty)
-                difficulty_actual = abs(np.mean(evidence)-0.5)
-            elif stim == 'diagonal':
-                evidence = make_evidence(difficulty)
-                difficulty_actual = np.mean(evidence)+0.5
-            if difficulty_actual > 1:
-                difficulty_actual = 1
-            if difficulty_actual < 0:
-                difficulty_actual = 0
-            print()
-            print(difficulty)
-            print(difficulty_actual)
+            if cond == 'impossible':
+                difficulty = 0.5
+                evidences = [make_evidence(difficulty) for _ in range(500)]
+                evidences_mean = np.array([np.mean(e) for e in evidences])
+                loc = np.where(np.abs(evidences_mean)<0.01)[0][0]
+                evidence = evidences[loc]
+                difficulty_actual = abs(np.mean(evidence))+0.5
+                print(np.mean(evidence))
+                print(difficulty_actual)
+            else:
+                difficulty = staircase._nextIntensity
+                if stim == 'cardinal':
+                    evidence = make_evidence(1-difficulty)
+                    difficulty_actual = abs(np.mean(evidence)-0.5)
+                elif stim == 'diagonal':
+                    evidence = make_evidence(difficulty)
+                    difficulty_actual = np.mean(evidence)+0.5
+                if difficulty_actual > 1:
+                    difficulty_actual = 1
+                if difficulty_actual < 0:
+                    difficulty_actual = 0
+                print()
+                print(difficulty)
+                print(difficulty_actual)
 
             ori = evidence_to_ori(evidence)
 
@@ -221,9 +231,12 @@ class GaborSession(PylinkEyetrackerSession): #Run session (or self) with multipl
                             'difficulty':difficulty, 'difficulty_actual':difficulty_actual, 'orientation': ori, 'DV': evidence}
 
             if i == 0:
-                phase_durations=[30,  1, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 5, 0.25, 3, 5, np.random.uniform(1.5,2.5,1)]
+                # phase_durations=[30,  1, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 5, 0.25, 3, 5, np.random.uniform(1.5,2.5,1)]
+                phase_durations=[30,  1, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 5, 0.25, np.random.uniform(1.5,2.5,1)]
             else:
-                phase_durations=[0.1, 1, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 5, 0.25, 3, 5, np.random.uniform(1.5,2.5,1)]
+                # phase_durations=[0.1, 1, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 5, 0.25, 3, 5, np.random.uniform(1.5,2.5,1)]
+                phase_durations=[0.1, 1, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 5, 0.25, np.random.uniform(1.5,2.5,1)]
+
 
             trial = DetectionTrial(
                 session=self,
@@ -244,8 +257,9 @@ class GaborSession(PylinkEyetrackerSession): #Run session (or self) with multipl
             if correct == -1:
                 pass
             else:
-                staircase.addResponse(correct, intensity=difficulty_actual)
-                staircase.calculateNextIntensity()
+                if cond == 'normal':
+                    staircase.addResponse(correct, intensity=difficulty_actual)
+                    staircase.calculateNextIntensity()
      
         self.close()
 
@@ -259,8 +273,8 @@ if __name__ == '__main__':
                            output_dir='data/0_staircase', 
                            settings_file=settings, 
                            task='diagonal_cardinal', 
-                           n_trials=200, awake=awake,
-                           eyetracker_on=False) #Set and run a session
+                           n_trials=100, awake=awake,
+                           eyetracker_on=True) #Set and run a session
     my_sess.run()
     time.sleep(1) # Sleep for 1 second
    
@@ -270,7 +284,9 @@ if __name__ == '__main__':
     print(df.head())
     
     df = df.loc[(df['event_type']=='iti')&(df['trial_nr']>20),:]
-    f_correct = (df['correct']==1).mean() * 100
+    f_correct = (df.loc[df['condition']=='impossible', 'correct']==1).mean() * 100
+    print('% correct = {}'.format(f_correct))
+    f_correct = (df.loc[df['condition']=='normal', 'correct']==1).mean() * 100
     print('% correct = {}'.format(f_correct))
 
     # analyze:

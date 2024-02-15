@@ -4,10 +4,10 @@ preferences:
     units: deg
 
 window:
-  size: [800, 600]
+  size: [1600, 1200]
   pos: [0, 0]
   color: [0, 0, 0]
-  fullscr: False
+  fullscr: True
   #winType: pyglet
   waitBlanking: True
   screen: 0
