@@ -26,7 +26,7 @@ from exptools2.core import Trial, Session, PylinkEyetrackerSession
 from IPython import embed
 
 def make_evidence(p):
-    return np.array([np.random.uniform(0,1)*p + np.random.uniform(-1,0)*(1-p) for _ in range(8)])
+    return np.array([np.random.uniform(-1,0)*p + np.random.uniform(0,1)*(1-p) for _ in range(8)])
  
 # def evidence_to_ori(evidence):
 #     ori = [np.random.choice([-1,1], p=[0.5, 0.5])*(e + 1)/2*45 for e in evidence]
@@ -38,9 +38,6 @@ def evidence_to_ori(value, leftMin, leftMax, rightMin, rightMax):
     rightSpan = rightMax - rightMin
     valueScaled = (value - leftMin) / leftSpan
     return rightMin + (valueScaled * rightSpan)
-
-from IPython import embed as shell
-# shell()
 
 class DetectionTrial(Trial): #Creation of the patterns for one trial
     
@@ -59,14 +56,21 @@ class DetectionTrial(Trial): #Creation of the patterns for one trial
 
         # intro text:
         perc_signal = 50
-        if (int(self.session.subject_nr) % 2) == 0:
-            text_string1 = "Press z for 'diagonal' and m for 'cardinal'.\n\n{}% of trials will be diagonal.".format(perc_signal)
-        elif (int(self.session.subject_nr) % 2) == 1:
-            text_string1 = "Press z for 'cardinal' and m for 'diagonal'.\n\n{}% of trials will be diagonal.".format(perc_signal)
+        # if (int(self.session.subject_nr) % 2) == 0:
+        #     text_string1 = "Press z for 'diagonal' and m for 'cardinal'.\n\n{}% of trials will be diagonal.".format(perc_signal)
+        # elif (int(self.session.subject_nr) % 2) == 1:
+        #     text_string1 = "Press z for 'cardinal' and m for 'diagonal'.\n\n{}% of trials will be diagonal.".format(perc_signal)
+        text_string1 = "Press z for 'counter-clockwise' and m for 'clockwise'.\n\n{}% of trials will be clockwise.".format(perc_signal)
+
         text_string2 = "Please sit still throughout the experiment, and try to relax and minimize blinking.\n\nPress spacebar to start."
         self.intro_text1 = TextStim(win=self.session.win, text=text_string1, pos=(0.0, 3), color=(1, 0, 0), height=1)
         self.intro_text2 = TextStim(win=self.session.win, text=text_string2, pos=(0.0, -3), height=0.5)
-
+        
+        attribution_text_string1 = parameters['rating'][0]
+        attribution_text_string2 = parameters['rating'][1]
+        self.attribution_text1 = TextStim(win=self.session.win, text=attribution_text_string1, pos=(-4, 0), color=(1, 0, 0), height=1)
+        self.attribution_text2 = TextStim(win=self.session.win, text=attribution_text_string2, pos=(4, 0), color=(1, 0, 0), height=1)
+        
         #point of fixation
         self.fixation = Circle(
                 win=self.session.win, units='pix', autoDraw=True,
@@ -92,7 +96,6 @@ class DetectionTrial(Trial): #Creation of the patterns for one trial
         self.incorrect_feedback = sound.Sound('test_incorrect.wav', stereo=False)
         self.feedback_played = False
 
-
 # Gratingstim(win, tex, mask, units, size, sf, pose, ori, phase?)
     def draw(self): #Draw the pattern through phases via 
 
@@ -107,7 +110,7 @@ class DetectionTrial(Trial): #Creation of the patterns for one trial
             self.fixation.draw()
 
         elif (self.phase == 2) | (self.phase == 4) | (self.phase == 6) | (self.phase == 8) | (self.phase == 10) | (self.phase == 12) | (self.phase == 14) | (self.phase == 16):
-            self.grating.ori = self.orientations[min(self.phase-2,7)]
+            self.grating.ori = self.orientations[(self.phase-2)//2]
             self.grating.draw()
             self.fixation.draw()
 
@@ -137,10 +140,17 @@ class DetectionTrial(Trial): #Creation of the patterns for one trial
                     self.incorrect_feedback.play()
                     self.feedback_played = True
         
-        elif self.phase == 13: # Attribution response
-            self.fixation.draw()
+        elif self.phase == 21: # Attribution response
+            if self.condition == 'normal':
+                self.stop_phase()
+            else:
+                self.fixation.draw()
+                self.attribution_text1.draw()
+                self.attribution_text2.draw()
 
-        elif self.phase == 14: # ITI
+        elif self.phase == 22: # ITI
+            if self.condition == 'normal':
+                self.stop_phase()
             self.fixation.draw()
 
     def get_events(self):
@@ -151,19 +161,25 @@ class DetectionTrial(Trial): #Creation of the patterns for one trial
                 if key in ['space']:
                     self.stop_phase()
 
-        if self.phase == 10:
+        if self.phase == 18:
             for key, t in events:
                 if key in ['z','m']:
-                    if ((int(self.session.subject_nr) % 2) == 0) and (key == 'z') and (np.mean(self.parameters['DV']) > 0): # even: z for diag
+                    if (key == 'z') and (np.mean(self.parameters['DV']) < 0): # even: z for counter clockwise
                         self.parameters['correct'] = 1
-                    elif ((int(self.session.subject_nr) % 2) == 0) and (key == 'm') and (np.mean(self.parameters['DV']) < 0): # even: m for card
-                        self.parameters['correct'] = 1
-                    elif ((int(self.session.subject_nr) % 2) == 1) and (key == 'z') and (np.mean(self.parameters['DV']) < 0): # odd: z for card
-                        self.parameters['correct'] = 1
-                    elif ((int(self.session.subject_nr) % 2) == 1) and (key == 'm') and (np.mean(self.parameters['DV']) > 0): # odd: m for diag
+                    elif (key == 'm') and (np.mean(self.parameters['DV']) > 0): # even: m for clockwise
                         self.parameters['correct'] = 1
                     else:
-                        self.parameters['correct']=0
+                        self.parameters['correct']= 0
+
+                    self.stop_phase()
+
+        if self.phase == 21:
+            for key, t in events:
+                if key in ['z','m']:
+                    if (key == 'z'):
+                        self.parameters['attribution'] = self.attribution_text1.text
+                    elif (key == 'm'):
+                        self.parameters['attribution'] = self.attribution_text2.text
 
                     self.stop_phase()
 
@@ -197,21 +213,33 @@ class GaborSession(PylinkEyetrackerSession): #Run session (or self) with multipl
         
 
         #Defining the stimuli wrt the task + conditions 
-        stimuli = ['diagonal', 'cardinal']
+        stimuli = ['ccw', 'cw']
         conditions = ['normal', 'impossible']
+        ratings = [
+                ['luck', 'effort'],
+                ['effort', 'luck'],
+                ['luck', 'ability'],
+                ['ability', 'luck'],
+                ['difficulty', 'effort'],
+                ['effort', 'difficulty'], 
+                ['difficulty', 'ability'],
+                ['ability', 'difficulty'],
+                ]
 
         #creation of a dict with all the trial parameters (task, stimuli, contrast of each participant, condition) = all the combination possible?
-        n_trials_per_strata = int(self.n_trials / len(stimuli) / len(conditions)) #number of trials per ?
+        n_trials_per_strata = int(self.n_trials / len(stimuli) / len(conditions) / len(ratings)) #number of trials per ?
         trial_parameters = [] 
         for stim in stimuli: 
             for cond in conditions:
-                for t in range(n_trials_per_strata):
-                    trial_parameters.append({'stimulus': stim, 'condition': cond})
+                for rating in ratings:
+                    for t in range(n_trials_per_strata):
+                        trial_parameters.append({'stimulus': stim, 'condition': cond, 'rating': rating})
         random.shuffle(trial_parameters)
 
         for i in range(self.n_trials):
             stim = trial_parameters[i]['stimulus']
             cond = trial_parameters[i]['condition']
+            rating = trial_parameters[i]['rating']
             if cond == 'impossible':
                 difficulty = 0.5
                 evidences = [make_evidence(difficulty) for _ in range(500)]
@@ -223,41 +251,53 @@ class GaborSession(PylinkEyetrackerSession): #Run session (or self) with multipl
                 print(difficulty_actual)
             else:
                 difficulty = staircase._nextIntensity
-                if stim == 'cardinal':
+                if stim == 'ccw':
                     evidence = make_evidence(1-difficulty)
-                    difficulty_actual = abs(np.mean(evidence)-0.5)
-                elif stim == 'diagonal':
-                    evidence = make_evidence(difficulty)
                     difficulty_actual = np.mean(evidence)+0.5
+                elif stim == 'cw':
+                    evidence = make_evidence(difficulty)
+                    difficulty_actual = abs(np.mean(evidence)-0.5)
+                    
                 if difficulty_actual > 1:
                     difficulty_actual = 1
                 if difficulty_actual < 0:
                     difficulty_actual = 0
                 print()
-                print(difficulty)
-                print(difficulty_actual)
+            
+            print(cond)
+            print(stim)
+            print(evidence)
+            print(difficulty)
+            print(difficulty_actual)
 
             # ori = evidence_to_ori(evidence)
-            ori = evidence_to_ori(evidence, 0, 1, -45, 45)
+            ori = evidence_to_ori(evidence, -1, 1, -45, 45)
             print(ori)
 
-            parameters = {'task': self.task, 'awake':self.awake, 'stimulus': stim, 'condition': cond, 
+            parameters = {'task': self.task, 'awake':self.awake, 'stimulus': stim, 'condition': cond, 'rating': rating, 
                             'difficulty':difficulty, 'difficulty_actual':difficulty_actual, 'orientation': ori, 'DV': evidence}
 
             if i == 0:
-                phase_durations=[30,  1, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 5, 0.25, 3, 5, np.random.uniform(1.5,2.5,1)]
-                # phase_durations=[30,  1, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 5, 0.25, np.random.uniform(1.5,2.5,1)]
+                phase_durations=[30,  np.random.uniform(0.5,1.5,1), 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 5, 0.25, 3, 8, 1]
             else:
-                phase_durations=[0.1, 1, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 5, 0.25, 3, 5, np.random.uniform(1.5,2.5,1)]
-                # phase_durations=[0.1, 1, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 5, 0.25, np.random.uniform(1.5,2.5,1)]
-
+                phase_durations=[0.1, np.random.uniform(0.5,1.5,1), 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 5, 0.25, 3, 8, 1]
 
             trial = DetectionTrial(
                 session=self,
                 trial_nr=i,
                 phase_durations=phase_durations,
                 timing='seconds',
-                phase_names=('intro', 'baseline', 'stim1', 'stim2', 'stim3', 'stim4', 'stim5', 'stim6', 'stim7', 'stim8', 'decision', 'delay', 'iti'),
+                phase_names=('intro', 'baseline', 
+                             'stim1', 'delay1', 
+                             'stim2', 'delay2', 
+                             'stim3', 'delay3', 
+                             'stim4', 'delay4', 
+                             'stim5', 'delay5', 
+                             'stim6', 'delay6',
+                             'stim7', 'delay7',
+                             'stim8', 'delay8',
+                             'decision', 'delay', 
+                             'feedback', 'attribution', 'iti'),
                 parameters=parameters,
                 load_next_during_phase=None,
                 verbose=True,
@@ -287,8 +327,8 @@ if __name__ == '__main__':
                            output_dir='data/0_staircase', 
                            settings_file=settings, 
                            task='diagonal_cardinal', 
-                           n_trials=100, awake=awake,
-                           eyetracker_on=False) #Set and run a session
+                           n_trials=96, awake=awake,
+                           eyetracker_on=True) #Set and run a session
     my_sess.run()
     time.sleep(1) # Sleep for 1 second
    
