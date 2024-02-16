@@ -76,7 +76,7 @@ class TestTrial(Trial):
         self.trialClock = core.Clock()
 
         # fixation:
-        fixation_color = 'red'
+        fixation_color = 'black'
         self.fixation = GratingStim(self.session.win,
                                     pos=(0,0),
                                     tex='sin',
@@ -89,9 +89,9 @@ class TestTrial(Trial):
         # gabor:
         if 'ori' in self.parameters:
             size = 800
-            sf = 0.01
+            sf = 0.02
             self.grating = GratingStim( 
-                win=self.session.win, tex='sin', mask='circle', units='pix', 
+                win=self.session.win, tex='sin', mask='gauss', units='pix', 
                 size=[size,size], contrast=1, opacity=1, sf=sf, texRes=128,
             )
             self.grating.ori = self.parameters['ori']
@@ -172,9 +172,9 @@ class TestEyetrackerSession(PylinkEyetrackerSession):
                                 'ori':ories[trial_nr],}
             
             if trial_nr == 0:
-                durations=(1, 1.2)
+                durations=(1, 0.5)
             else:
-                durations=(0, 1.2)
+                durations=(0.7, 0.5)
 
             self.trials.append(
                 TestTrial(session=self,
@@ -205,6 +205,6 @@ if __name__ == '__main__':
     settings = op.join(op.dirname(__file__), 'settings.yml')
     session = TestEyetrackerSession(output_str='{}_{}_{}'.format(subject_nr, block_nr, dt),
                                     output_dir='data/',
-                                    eyetracker_on=False, n_trials=600, settings_file=settings)
+                                    eyetracker_on=True, n_trials=600, settings_file=settings)
     session.create_trials()
     session.run()

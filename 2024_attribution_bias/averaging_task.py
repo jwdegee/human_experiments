@@ -26,12 +26,21 @@ from exptools2.core import Trial, Session, PylinkEyetrackerSession
 from IPython import embed
 
 def make_evidence(p):
-    return [np.random.uniform(0,1)*p + np.random.uniform(-1,0)*(1-p) for _ in range(8)]
+    return np.array([np.random.uniform(0,1)*p + np.random.uniform(-1,0)*(1-p) for _ in range(8)])
  
-def evidence_to_ori(evidence):
-    ori = [np.random.choice([-1,1], p=[0.5, 0.5])*(e + 1)/2*45 for e in evidence]
-    ori = [o + (90*int(np.random.rand(1)>0.5)) for o in ori]
-    return ori
+# def evidence_to_ori(evidence):
+#     ori = [np.random.choice([-1,1], p=[0.5, 0.5])*(e + 1)/2*45 for e in evidence]
+#     ori = [o + (90*int(np.random.rand(1)>0.5)) for o in ori]
+#     return ori
+
+def evidence_to_ori(value, leftMin, leftMax, rightMin, rightMax):
+    leftSpan = leftMax - leftMin
+    rightSpan = rightMax - rightMin
+    valueScaled = (value - leftMin) / leftSpan
+    return rightMin + (valueScaled * rightSpan)
+
+from IPython import embed as shell
+# shell()
 
 class DetectionTrial(Trial): #Creation of the patterns for one trial
     
@@ -97,20 +106,23 @@ class DetectionTrial(Trial): #Creation of the patterns for one trial
         if self.phase == 1:  # baseline
             self.fixation.draw()
 
-        elif (self.phase >= 2) and (self.phase <= 9): # decision interval = à changer +++++
+        elif (self.phase == 2) | (self.phase == 4) | (self.phase == 6) | (self.phase == 8) | (self.phase == 10) | (self.phase == 12) | (self.phase == 14) | (self.phase == 16):
             self.grating.ori = self.orientations[min(self.phase-2,7)]
             self.grating.draw()
             self.fixation.draw()
 
-        elif self.phase == 10: #report
+        elif (self.phase == 3) | (self.phase == 5) | (self.phase == 7) | (self.phase == 9) | (self.phase == 11) | (self.phase == 13) | (self.phase == 15) | (self.phase == 17):
+            self.fixation.draw()
+
+        elif self.phase == 18: #report
             self.fixation.fillColor = 'blue'
             self.fixation.draw()
      
-        elif self.phase == 11: #rdelay
+        elif self.phase == 19: #rdelay
             self.fixation.fillColor = 'black'
             self.fixation.draw()
 
-        elif self.phase == 12: # Feedback
+        elif self.phase == 20: # Feedback
             self.fixation.ori = 0
             self.fixation.draw()
 
@@ -225,17 +237,19 @@ class GaborSession(PylinkEyetrackerSession): #Run session (or self) with multipl
                 print(difficulty)
                 print(difficulty_actual)
 
-            ori = evidence_to_ori(evidence)
+            # ori = evidence_to_ori(evidence)
+            ori = evidence_to_ori(evidence, 0, 1, -45, 45)
+            print(ori)
 
             parameters = {'task': self.task, 'awake':self.awake, 'stimulus': stim, 'condition': cond, 
                             'difficulty':difficulty, 'difficulty_actual':difficulty_actual, 'orientation': ori, 'DV': evidence}
 
             if i == 0:
-                # phase_durations=[30,  1, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 5, 0.25, 3, 5, np.random.uniform(1.5,2.5,1)]
-                phase_durations=[30,  1, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 5, 0.25, np.random.uniform(1.5,2.5,1)]
+                phase_durations=[30,  1, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 5, 0.25, 3, 5, np.random.uniform(1.5,2.5,1)]
+                # phase_durations=[30,  1, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 5, 0.25, np.random.uniform(1.5,2.5,1)]
             else:
-                # phase_durations=[0.1, 1, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 5, 0.25, 3, 5, np.random.uniform(1.5,2.5,1)]
-                phase_durations=[0.1, 1, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 5, 0.25, np.random.uniform(1.5,2.5,1)]
+                phase_durations=[0.1, 1, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 5, 0.25, 3, 5, np.random.uniform(1.5,2.5,1)]
+                # phase_durations=[0.1, 1, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 0.250, 5, 0.25, np.random.uniform(1.5,2.5,1)]
 
 
             trial = DetectionTrial(
@@ -274,7 +288,7 @@ if __name__ == '__main__':
                            settings_file=settings, 
                            task='diagonal_cardinal', 
                            n_trials=100, awake=awake,
-                           eyetracker_on=True) #Set and run a session
+                           eyetracker_on=False) #Set and run a session
     my_sess.run()
     time.sleep(1) # Sleep for 1 second
    
