@@ -207,14 +207,14 @@ class GaborSession(PylinkEyetrackerSession): #Run session (or self) with multipl
             self.start_recording_eyetracker()
 
         # staircase:
-        staircase = data.QuestHandler(startVal=0.65, startValSd=0.15,
+        staircase = data.QuestHandler(startVal=0.60, startValSd=0.15,
             pThreshold=0.75, grain=0.01, gamma=0.5, delta=0.01,
             nTrials=self.n_trials, minVal=0.5, maxVal=1)
         
 
         #Defining the stimuli wrt the task + conditions 
         stimuli = ['ccw', 'cw']
-        conditions = ['normal', 'impossible']
+        conditions = ['normal']
         ratings = [
                 ['luck', 'effort'],
                 ['effort', 'luck'],
@@ -278,9 +278,9 @@ class GaborSession(PylinkEyetrackerSession): #Run session (or self) with multipl
                             'difficulty':difficulty, 'difficulty_actual':difficulty_actual, 'orientation': ori, 'DV': evidence}
 
             if i == 0:
-                phase_durations=[30,  np.random.uniform(0.5,1.5,1), 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 5, 0.25, 3, 8, 1]
+                phase_durations=[30,  np.random.uniform(0.5,1.5,1), 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 5, 0.25, 0.25, 0, 0]
             else:
-                phase_durations=[0.1, np.random.uniform(0.5,1.5,1), 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 5, 0.25, 3, 8, 1]
+                phase_durations=[0.1, np.random.uniform(0.5,1.5,1), 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 0.2, 0.05, 5, 0.25, 0.25, 0, 0]
 
             trial = DetectionTrial(
                 session=self,
@@ -324,16 +324,16 @@ if __name__ == '__main__':
     dt = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
     settings = op.join(op.dirname(__file__), 'settings.yml')
     my_sess = GaborSession(output_str='{}_{}_{}'.format(subject_nr, block_nr, dt), 
-                           output_dir='data/0_staircase', 
+                           output_dir='data/practise', 
                            settings_file=settings, 
                            task='diagonal_cardinal', 
-                           n_trials=96, awake=awake,
-                           eyetracker_on=True) #Set and run a session
+                           n_trials=48, awake=awake,
+                           eyetracker_on=False) #Set and run a session
     my_sess.run()
     time.sleep(1) # Sleep for 1 second
    
     # analyze + data acquisition (file with the data)
-    filename = glob.glob(op.join('data', '0_staircase', '{}_{}_{}*events.tsv'.format(subject_nr, block_nr, dt)))[0]
+    filename = glob.glob(op.join('data', 'practise', '{}_{}_{}*events.tsv'.format(subject_nr, block_nr, dt)))[0]
     df = pd.read_csv(filename, sep='\t')
     print(df.head())
     
@@ -344,7 +344,7 @@ if __name__ == '__main__':
     print('% correct = {}'.format(f_correct))
 
     # analyze:
-    filename = glob.glob(op.join('data', '0_staircase', '{}_{}_{}*events.tsv'.format(subject_nr, block_nr, dt)))[0]
+    filename = glob.glob(op.join('data', 'practise', '{}_{}_{}*events.tsv'.format(subject_nr, block_nr, dt)))[0]
     df = pd.read_csv(filename, sep='\t')
     print(df.head())
     fig = plt.figure()

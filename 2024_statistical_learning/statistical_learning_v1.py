@@ -7,7 +7,7 @@ import pandas as pd
 import datetime
 
 from psychopy import prefs
-prefs.hardware['audioLib'] = ['ptb']
+prefs.hardware['audioLib'] = ['pygame']
 from psychopy import sound, core
 print(sound.Sound)
 from psychopy.visual import TextStim
@@ -33,7 +33,7 @@ def into_ories(value, leftMin, leftMax, rightMin, rightMax):
     valueScaled = (value - leftMin) / leftSpan
     return rightMin + (valueScaled * rightSpan)
 
-def make_samples(H, mu, p, n_samples):
+def make_samples(H, mu, sigma, cutoff, n_samples):
 
     state = int(np.random.rand(1)[0]>0.5)
     samples = np.zeros(n_samples)
@@ -48,23 +48,23 @@ def make_samples(H, mu, p, n_samples):
                 state = 0
         
         # draw sample:
-        if np.random.rand(1)[0] > p:
-            if state == 0:
-                sample = mu[1] # oddball
-            elif state == 1:
-                sample = mu[0] # oddball
-        else:
-            if state == 0:
-                sample = mu[0] # standard
-            elif state == 1:
-                sample = mu[1] # standard
+        sample = np.random.normal(mu[state], sigma[state], 1)[0]
         
+        # threshold:
+        if sample < cutoff[0]:
+            sample = cutoff[0]
+        elif sample > cutoff[1]:
+            sample = cutoff[1]
+
         # add
         samples[i] = sample
         states[i] = state
     states[states==0] = -1
 
-    return states, samples
+    LLRin = np.log(sp.stats.norm.pdf(samples,mu[0]*-1,sigma[0])/
+                sp.stats.norm.pdf(samples,mu[1]*-1,sigma[1]))
+
+    return states, samples, LLRin
 
 class TestTrial(Trial):
     """ Simple trial with text (trial x) and fixation. """
@@ -100,12 +100,12 @@ class TestTrial(Trial):
         # sound:
         if 'freq' in self.parameters:
             self.sound_played = False
-            self.snd = sound.Sound(value=self.parameters['freq'], hamming=True,
-                    secs=0.5, octave=4, stereo=-1)
+            self.snd = sound.Sound(value=self.parameters['freq'], 
+                    secs=0.5, octave=4, stereo=-1) 
             self.snd.setVolume(self.parameters['volume'])
             
         # intro text:
-        text_string1 = "You will see or hear a sequence of stimuli"
+        text_string1 = "You will see a sequence of stimuli"
         text_string2 = "Please fixate on the black fixation mark, try to relax and try to minimize blinking.\n\nPress spacebar to start."
         self.intro_text1 = TextStim(win=self.session.win, text=text_string1, pos=(0.0, 3), color=(1, 0, 0), height=1)
         self.intro_text2 = TextStim(win=self.session.win, text=text_string2, pos=(0.0, -3), height=0.5)
@@ -137,7 +137,7 @@ class TestTrial(Trial):
                 contrast = 1.0 - ((t-0.4) / 0.1) # ramp down from 1 to 0
             else:
                 contrast = 1.0 # must be in the middle 2s period
-            contrast = max((contrast, 0))         
+            contrast = min((contrast, 0))         
             
             print(contrast)
             if 'freq' in self.parameters:
@@ -168,48 +168,48 @@ class TestEyetrackerSession(PylinkEyetrackerSession):
         self.subject_id = int(output_str.split('_')[0])
         self.block_id = int(output_str.split('_')[1])
         
-
-        if self.subject_id%2 == 0:
-            if self.block_id%2 == 0:
-                self.condition = 'visual'
-            else:
-                self.condition = 'auditory'
-        else:
-            if self.block_id%2 == 1:
-                self.condition = 'visual'
-            else:
-                self.condition = 'auditory'
-
-        # order = pd.read_csv('order.csv')
-        # order = order.loc[order['subject_id']==self.subject_id, 'order'].values[0]
-        # self.condition = order[self.block_id]        
-                
+        order = pd.read_csv('order.csv')
+        order = order.loc[order['subject_id']==self.subject_id, 'order'].values[0]
+        self.condition = order[self.block_id]        
+        
+        
         super().__init__(output_str, output_dir=output_dir,
                          settings_file=settings_file, eyetracker_on=eyetracker_on)
 
     def create_trials(self, timing='seconds'):
                 
         # draw states:
-        H = 0.05
-        if self.condition == 'visual':
-            states, ories = make_samples(H=H, 
-                                            mu=[-45,45], 
-                                            p=0.9,
-                                            n_samples=self.n_trials)
-        elif self.condition == 'auditory':
-            states, freqs = make_samples(H=H, 
-                                            mu=[1000,2000], 
-                                            p=0.9,
-                                            n_samples=self.n_trials)
-     
-            # compute volumes (correcting for equal-loudness contour):
-            from iso226 import iso226_spl_itpl
-            contour_interpolated = iso226_spl_itpl(L_N=40, hfe=False, k=3)
-            contour_inverted = 1 / contour_interpolated(freqs)
-            volumes = contour_inverted / contour_inverted.max()
+        mu = 20          # means of generative distributions (polar angles relative to downward vertical midline of zero; + is left of midline)
+        if (self.condition == 'A') | (self.condition == 'B'):
+            H = 0.08 # hazard rate of distribution switches
+        elif (self.condition == 'C') | (self.condition == 'D'):
+            H = 0.06 # hazard rate of distribution switches
 
+        if (self.condition == 'A') | (self.condition == 'C'):
+            sigma = 15        # standard deviations
+        elif (self.condition == 'B') | (self.condition == 'D'):
+            sigma = 10        # standard deviations       
+        cutoff = sp.stats.norm.ppf(0.99,loc=mu,scale=sigma)   
+          
+        states, samples, LLRin = make_samples(H=H, 
+                                              mu=[-mu,mu], 
+                                              sigma=[sigma,sigma],
+                                              cutoff=[-cutoff,cutoff], 
+                                              n_samples=self.n_trials)
         print(states)
+       
+        # map onto frequencies:
+        freqs = into_logspaced_freqs(samples, -cutoff, cutoff, 500, 3)
 
+        # compute volumes (correcting for equal-loudness contour):
+        from iso226 import iso226_spl_itpl
+        contour_interpolated = iso226_spl_itpl(L_N=40, hfe=False, k=3)
+        contour_inverted = 1 / contour_interpolated(freqs)
+        volumes = contour_inverted / contour_inverted.max()
+
+        # map onto orientations:
+        ories = into_ories(samples, -cutoff, cutoff, -67, 67)
+        
         self.trials = []
         for trial_nr in range(self.n_trials):
             
@@ -219,26 +219,22 @@ class TestEyetrackerSession(PylinkEyetrackerSession):
             #                 'freq':freqs[trial_nr],
             #                 'volume':volumes[trial_nr],}
 
-            if self.condition == 'visual':
-                parameters = {
-                                'condition':self.condition,
-                                'hazard':H,
-                                'state':states[trial_nr],
-                                'ori':ories[trial_nr],}
-            elif self.condition == 'auditory':
-                parameters = {
-                                'condition':self.condition,
-                                'hazard':H,
-                                'state':states[trial_nr],
-                                'freq':freqs[trial_nr],
-                                'volume':volumes[trial_nr]}
+            parameters = {
+                            'condition':self.condition,
+                            'hazard':H,
+                            'mu':mu,
+                            'sigma':sigma,
+                            'state':states[trial_nr],
+                            'sample':samples[trial_nr],
+                            'LLRin':LLRin[trial_nr],
+                            'ori':ories[trial_nr],}
             
             if trial_nr == 0:
-                durations=(30, 1, 0.5)
+                durations=(30, 0.5, 0.7)
             elif trial_nr == self.n_trials-1:
-                durations=(0, 1, 5)
+                durations=(0, 0.5, 5)
             else:
-                durations=(0, 1, 0.5)
+                durations=(0, 0.5, 0.7)
 
             self.trials.append(
                 TestTrial(session=self,
@@ -260,6 +256,7 @@ class TestEyetrackerSession(PylinkEyetrackerSession):
             trial.run()
 
         self.close()  # contains tracker.stopRecording()
+
 
 if __name__ == '__main__':
     subject_nr = input('Subject #: ')
