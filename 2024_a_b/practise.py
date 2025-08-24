@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 # import psychtoolbox as ptb
 
 from psychopy import prefs
-prefs.hardware['audioLib'] = ['pygame']
+prefs.hardware['audioLib'] = ['sounddevice']
 
 from psychopy.visual import TextStim, Rect, Circle, GratingStim, NoiseStim, filters
 from psychopy import sound
@@ -23,7 +23,7 @@ from psychopy import event, data
 
 from exptools2.core import Trial, Session, PylinkEyetrackerSession
 
-from IPython import embed
+# from IPython import embed
 
 def make_evidence(p):
     return np.array([np.random.uniform(-1,0)*p + np.random.uniform(0,1)*(1-p) for _ in range(8)])

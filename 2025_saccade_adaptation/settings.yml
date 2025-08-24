@@ -1,21 +1,22 @@
 preferences:
   general:
     audioLib: PTB
-    units: deg
+    units: pix
 
 window:
+  # fullscr: True
   size: [3840, 2160]
-  pos: [0, 0]
+  fullscr: False
+  # size: [2000, 2000]
+  # pos: [900, 80]
   color: [0, 0, 0]
-  fullscr: True
-  #winType: pyglet
   waitBlanking: True
   screen: 0
 
 monitor:
   name: default
-  width: 50  # in cm
-  distance: 80  # in cm
+  width: 72     # in cm
+  distance: 50  # in cm
   gamma: 1
 
 mouse:
@@ -27,4 +28,4 @@ eyetracker:
   options:
     calibration_area_proportion: 0.4 0.5
     validation_area_proportion: 0.4 0.5
-    calibration_type: HV5
+    calibration_type: HV9

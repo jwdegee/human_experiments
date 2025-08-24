@@ -1,4 +1,5 @@
 import os.path as op
+import random
 import numpy as np
 import scipy as sp
 from scipy import stats
@@ -7,14 +8,17 @@ import pandas as pd
 import datetime
 
 from psychopy import prefs
-# prefs.hardware['audioLib'] = ['ptb']
+prefs.hardware['audioLib'] = ['sounddevice']
+
 from psychopy import sound, core
-print(sound.Sound)
 from psychopy.visual import TextStim
 from psychopy.visual import GratingStim
 
 from exptools2.core import PylinkEyetrackerSession
 from exptools2.core import Trial
+
+
+print(sound.Sound)
 
 def into_logspaced_freqs(values, values_min, values_max, min_f, nr_octaves):
     
@@ -83,7 +87,7 @@ class TestTrial(Trial):
                                     tex='sin',
                                     mask='circle',
                                     size=0.2,
-                                    texRes=9,
+                                    texRes=21,
                                     color=fixation_color,
                                     sf=0)
 
@@ -100,9 +104,7 @@ class TestTrial(Trial):
         # sound:
         if 'freq' in self.parameters:
             self.sound_played = False
-            # self.snd = sound.Sound(value=self.parameters['freq'], hamming=True, secs=0.5, octave=4, stereo=-1)
-            self.snd = sound.Sound(value=self.parameters['freq'], hamming=True, secs=0.5, octave=4, stereo=True)
-
+            self.snd = sound.Sound(value=self.parameters['freq'], hamming=True, secs=0.5, octave=4, stereo=False)
             self.snd.setVolume(self.parameters['volume'])
             
         # intro text:
@@ -132,20 +134,19 @@ class TestTrial(Trial):
             
             t = self.trialClock.getTime() - self.phase1_time
             
-            if t < 0.1:
-                contrast = t / 0.1 # ramp from 0 at the beginning, 1.0 at the end
-            elif t > 0.4:
-                contrast = 1.0 - ((t-0.4) / 0.1) # ramp down from 1 to 0
-            else:
-                contrast = 1.0 # must be in the middle 2s period
-            contrast = max((contrast, 0))         
-            
-            print(contrast)
             if 'freq' in self.parameters:
                 if not self.sound_played:
                     self.snd.play()
                     self.sound_played = True
             if 'ori' in self.parameters:
+                if t < 0.1:
+                    contrast = t / 0.1 # ramp from 0 at the beginning, 1.0 at the end
+                elif t > 0.4:
+                    contrast = 1.0 - ((t-0.4) / 0.1) # ramp down from 1 to 0
+                else:
+                    contrast = 1.0 # must be in the middle 2s period
+                contrast = max((contrast, 0))         
+                print(contrast)
                 self.grating.contrast = contrast
                 self.grating.draw()
                 # self.grating.setPhase(0.5*t)
@@ -169,17 +170,17 @@ class TestEyetrackerSession(PylinkEyetrackerSession):
         self.subject_id = int(output_str.split('_')[0])
         self.block_id = int(output_str.split('_')[1])
         
-
-        if self.subject_id%2 == 0:
-            if self.block_id%2 == 0:
-                self.condition = 'visual'
-            else:
-                self.condition = 'auditory'
-        else:
-            if self.block_id%2 == 1:
-                self.condition = 'visual'
-            else:
-                self.condition = 'auditory'
+        # if self.subject_id%2 == 0:
+        #     if self.block_id%2 == 0:
+        #         self.condition = 'visual'
+        #     else:
+        #         self.condition = 'auditory'
+        # else:
+        #     if self.block_id%2 == 1:
+        #         self.condition = 'visual'
+        #     else:
+        #         self.condition = 'auditory'
+        self.condition = 'auditory'
 
         # order = pd.read_csv('order.csv')
         # order = order.loc[order['subject_id']==self.subject_id, 'order'].values[0]
@@ -189,50 +190,42 @@ class TestEyetrackerSession(PylinkEyetrackerSession):
                          settings_file=settings_file, eyetracker_on=eyetracker_on)
 
     def create_trials(self, timing='seconds'):
-                
+
+        conditions = ['control', 'surprise', 'control', 'surprise', 'control', 'surprise']
+        condition = conditions[self.block_id-1]
+
         # draw states:
         H = 0.05
-        if self.condition == 'visual':
-            states, ories = make_samples(H=H, 
-                                            mu=[-45,45], 
-                                            p=0.9,
-                                            n_samples=self.n_trials)
-        elif self.condition == 'auditory':
+        if condition == 'control':
+            frequencies = [500, 650, 800, 1000, 1300, 1600, 2000, 2600, 3300, 4000]
+            freqs = []
+            for f in frequencies:
+                for _ in range(int(self.n_trials / len(frequencies))):
+                    freqs.append(f)
+            random.shuffle(freqs)
+            states = np.ones(self.n_trials)
+        elif condition == 'surprise':
             states, freqs = make_samples(H=H, 
-                                            mu=[1000,2000], 
-                                            p=0.9,
-                                            n_samples=self.n_trials)
+                                        mu=[1000,2000], 
+                                        p=0.9,
+                                        n_samples=self.n_trials)
      
-            # compute volumes (correcting for equal-loudness contour):
-            from iso226 import iso226_spl_itpl
-            contour_interpolated = iso226_spl_itpl(L_N=40, hfe=False, k=3)
-            contour_inverted = 1 / contour_interpolated(freqs)
-            volumes = contour_inverted / contour_inverted.max()
+        # compute volumes (correcting for equal-loudness contour):
+        from iso226 import iso226_spl_itpl
+        contour_interpolated = iso226_spl_itpl(L_N=40, hfe=False, k=3)
+        contour_inverted = 1 / contour_interpolated(freqs)
+        volumes = contour_inverted / contour_inverted.max()
 
         print(states)
 
         self.trials = []
         for trial_nr in range(self.n_trials):
-            
-            # parameters = {'state':states[trial_nr],
-            #                 'sample':samples[trial_nr],
-            #                 'LLRin':LLRin[trial_nr],
-            #                 'freq':freqs[trial_nr],
-            #                 'volume':volumes[trial_nr],}
-
-            if self.condition == 'visual':
-                parameters = {
-                                'condition':self.condition,
-                                'hazard':H,
-                                'state':states[trial_nr],
-                                'ori':ories[trial_nr],}
-            elif self.condition == 'auditory':
-                parameters = {
-                                'condition':self.condition,
-                                'hazard':H,
-                                'state':states[trial_nr],
-                                'freq':freqs[trial_nr],
-                                'volume':volumes[trial_nr]}
+            parameters = {
+                            'condition':condition,
+                            'hazard':H,
+                            'state':states[trial_nr],
+                            'freq':freqs[trial_nr],
+                            'volume':volumes[trial_nr]}
             
             if trial_nr == 0:
                 durations=(30, 1, 0.5)
