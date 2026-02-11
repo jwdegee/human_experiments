@@ -7,9 +7,10 @@ import pandas as pd
 import datetime
 
 from psychopy import prefs
-# prefs.hardware['audioLib'] = ['ptb']
+prefs.hardware['audioLib'] = ['PTB']
+prefs.hardware['audioDevice'] = 'Headphones (Realtek(R) Audio)'
+
 from psychopy import sound, core
-print(sound.Sound)
 from psychopy.visual import TextStim
 from psychopy.visual import GratingStim
 

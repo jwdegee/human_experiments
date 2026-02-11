@@ -4,21 +4,17 @@ import numpy as np
 import scipy as sp
 from scipy import stats
 import pandas as pd
-
 import datetime
 
 from psychopy import prefs
-prefs.hardware['audioLib'] = ['sounddevice']
-
+prefs.hardware['audioLib'] = ['PTB']
+prefs.hardware['audioDevice'] = 'Headphones (Realtek(R) Audio)'
 from psychopy import sound, core
 from psychopy.visual import TextStim
 from psychopy.visual import GratingStim
 
 from exptools2.core import PylinkEyetrackerSession
 from exptools2.core import Trial
-
-
-print(sound.Sound)
 
 def into_logspaced_freqs(values, values_min, values_max, min_f, nr_octaves):
     

@@ -1,0 +1,30 @@
+preferences:
+  general:
+    audioLib: PTB
+    units: deg
+
+window:
+  size: [3840, 2160]
+  pos: [0, 0]
+  color: [0, 0, 0]
+  fullscr: True
+  #winType: pyglet
+  waitBlanking: True
+  screen: 0
+
+monitor:
+  name: default
+  width: 50  # in cm
+  distance: 80  # in cm
+  gamma: 1
+
+mouse:
+  visible: False
+
+eyetracker:
+  address: '100.1.1.1'
+  dot_size: 0.1  # in deg
+  options:
+    calibration_area_proportion: 0.4 0.5
+    validation_area_proportion: 0.4 0.5
+    calibration_type: HV5

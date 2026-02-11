@@ -12,16 +12,17 @@ import pandas as pd
 import random
 import matplotlib.pyplot as plt
 
-# import psychtoolbox as ptb
-
 from psychopy import prefs
-prefs.hardware['audioLib'] = ['sounddevice']
+prefs.hardware['audioLib'] = ['PTB']
+prefs.hardware['audioDevice'] = 'Headphones (Realtek(R) Audio)'
+from psychopy import sound, core
+from psychopy.visual import TextStim
+from psychopy.visual import GratingStim
 
-from psychopy.visual import TextStim, Rect, Circle, GratingStim, NoiseStim, filters
-from psychopy import sound
-from psychopy import event, data
+from exptools2.core import PylinkEyetrackerSession
+from exptools2.core import Trial
 
-from exptools2.core import Trial, Session, PylinkEyetrackerSession
+print(sound.Sound)
 
 def make_evidence(p):
     return np.array([np.random.uniform(-1,0)*p + np.random.uniform(0,1)*(1-p) for _ in range(8)])
